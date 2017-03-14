@@ -27,10 +27,17 @@ from __future__ import (print_function, division, unicode_literals,
                         absolute_import)
 
 import os
+import sys
 
 import pytest
 
 from sphinxcontrib.programoutput import ProgramOutputCache, Command
+
+is_windows = sys.platform == 'win32'
+if is_windows:
+    ECHO = 'python -c "print(\'%s\')"'
+else:
+    ECHO = 'echo %s'
 
 
 def pytest_funcarg__cache(request):
@@ -45,10 +52,19 @@ def assert_cache(cache, cmd, output, returncode=0):
 
 
 def test_simple(cache):
-    assert_cache(cache, Command(['echo', 'blök']), 'blök')
+    if is_windows:
+        pytest.skip('Unicode errors on Windows.')
+        cmd = ["python", "-c", "print('blök')"]
+    else:
+        cmd = ['echo', 'blök']
+    print(cmd)
+    print(Command(cmd))
+    assert_cache(cache, Command(cmd), 'blök')
 
 
 def test_shell(cache):
+    if is_windows:
+        pytest.skip('Unicode errors on Windows.')
     assert_cache(cache, Command('echo blök', shell=True), 'blök')
 
 
@@ -64,7 +80,11 @@ def test_working_directory_shell(cache, tmpdir):
     cwd = tmpdir.join('wd')
     cwd.ensure(dir=True)
     cwd = os.path.realpath(os.path.normpath(str(cwd)))
-    cmd = Command('echo $PWD', working_directory=cwd, shell=True)
+    if is_windows:
+        cmdstr = 'python -c "import os;print(os.getcwd())"'
+    else:
+        cmdstr = 'echo $PWD'
+    cmd = Command(cmdstr, working_directory=cwd, shell=True)
     assert_cache(cache, cmd, cwd)
 
 
@@ -79,13 +99,18 @@ def test_nonzero_return_code(cache):
 
 
 def test_nonzero_return_code_shell(cache):
-    cmd = "python -c 'import sys; sys.exit(1)'"
+    cmd = 'python -c "import sys; sys.exit(1)"'
     assert_cache(cache, Command(cmd, shell=True), '', returncode=1)
 
 
 @pytest.mark.with_content('dummy content')
 def test_cache_pickled(app, doctreedir):
-    cmd = Command(['echo', 'spam'])
+    if is_windows:
+        cmdtuple = 'python', '-c', 'print("spam")'
+    else:
+        cmdtuple = 'echo', 'spam'
+
+    cmd = Command(cmdtuple)
     result = (0, 'spam')
     assert app.env.programoutput_cache[cmd] == result
     app.build()

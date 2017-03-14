@@ -27,12 +27,19 @@ from __future__ import (print_function, division, unicode_literals,
                         absolute_import)
 
 import os.path
+import sys
+
+is_windows = sys.platform == 'win32'
+if is_windows:
+    ECHO = 'python -c "print(\'%s\')"'
+else:
+    ECHO = 'echo %s'
 
 from sphinxcontrib.programoutput import Command, program_output
 
 
 def test_new_with_string_command():
-    cmd = 'echo "spam with eggs"'
+    cmd = ECHO % "spam with eggs"
     assert Command(cmd).command == cmd
     assert Command(cmd, shell=True).command == cmd
 
@@ -51,14 +58,17 @@ def test_new_with_list_hashable():
 
 
 def test_from_programoutput_node():
+    workdir = '/spam/with/eggs'
+    if is_windows:
+        workdir = 'C:' + workdir.replace('/', '\\')
     node = program_output()
-    node['command'] = 'echo spam'
+    node['command'] = ECHO % 'spam'
     node['use_shell'] = False
     node['hide_standard_error'] = False
-    node['working_directory'] = '/spam/with/eggs'
+    node['working_directory'] = workdir
     command = Command.from_program_output_node(node)
-    assert command.command == 'echo spam'
-    assert command.working_directory == '/spam/with/eggs'
+    assert command.command == ECHO % 'spam'
+    assert command.working_directory == workdir
     assert not command.shell
     assert not command.hide_standard_error
     node['use_shell'] = True
@@ -70,17 +80,17 @@ def test_from_programoutput_node():
 
 def test_from_programoutput_node_extraargs():
     node = program_output()
-    node['command'] = 'echo spam'
+    node['command'] = cmd = ECHO % 'spam'
     node['use_shell'] = False
     node['hide_standard_error'] = False
     node['extraargs'] = 'with eggs'
     node['working_directory'] = '/'
     command = Command.from_program_output_node(node)
-    assert command.command == 'echo spam with eggs'
+    assert command.command == cmd + ' with eggs'
 
 
 def test_execute():
-    process = Command('echo spam').execute()
+    process = Command(ECHO % 'spam').execute()
     assert process.stderr is None
     assert not process.stdout.closed
     assert process.wait() == 0
@@ -94,13 +104,13 @@ def test_execute_with_shell():
 
 
 def test_execute_with_hidden_standard_error():
-    process = Command('echo spam', hide_standard_error=True).execute()
+    process = Command(ECHO % 'spam', hide_standard_error=True).execute()
     assert not process.stderr.closed
     assert process.wait() == 0
 
 
 def test_get_output():
-    returncode, output = Command('echo spam').get_output()
+    returncode, output = Command(ECHO % 'spam').get_output()
     assert returncode == 0
     assert output == 'spam'
 

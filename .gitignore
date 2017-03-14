@@ -9,6 +9,7 @@
 *.sublime-*
 .coverage
 .runtimes
+.tox
 htmlcov/
 bin/
 develop-eggs/
